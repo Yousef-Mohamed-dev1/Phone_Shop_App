@@ -1,16 +1,26 @@
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import threading
 import time
 
-# --- رابط قاعدة البيانات المحلية والجلوبال ---
-# استبدل الباسورد والـ IP ببياناتك الحقيقية
+# --- روابط قواعد البيانات ---
 LOCAL_DB_URI = "postgresql://postgres:yousef1312012@192.168.0.102:5432/phone_shop"
 CLOUD_DB_URI = "postgresql://postgres:Yousef1312012*@db.ywbcmahdcrxhezewjzty.supabase.co:5432/postgres"
 
-# --- 1. فحص نوع الاتصال المتاح (لوكال أم جلوبال) ---
+# --- 1. فحص نوع الاتصال المتاح ---
 def get_connection():
-    """يفحص الواي فاي المحلي أولاً، وإذا لم يجده يتحول لـ Supabase أونلاين"""
+    """إذا كان التطبيق يعمل على Vercel، يتصل فوراً بـ Supabase بدون محاولة الاتصال بالشبكة المحلية"""
+    # بيئة Vercel
+    if os.environ.get("VERCEL"):
+        try:
+            conn = psycopg2.connect(CLOUD_DB_URI, connect_timeout=5)
+            return conn, "سحابي (Supabase)"
+        except Exception as e:
+            print(f"Vercel DB Connection Error: {e}")
+            return None, "غير متصل"
+
+    # التشغيل المحلي على جهاز المحل
     try:
         conn = psycopg2.connect(LOCAL_DB_URI, connect_timeout=1)
         return conn, "لوكال (الواي فاي)"
@@ -54,6 +64,9 @@ def search_phone(query):
             else:
                 cur.execute("SELECT * FROM phones WHERE brand ILIKE %s OR model ILIKE %s ORDER BY id DESC LIMIT 20;", (f"%{query}%", f"%{query}%"))
             return cur.fetchall()
+    except Exception as e:
+        print(f"Search Error: {e}")
+        return []
     finally:
         conn.close()
 
@@ -79,6 +92,8 @@ def sell_phone_db(phone_id, sell_price, customer_name, customer_phone, sell_note
             cur.execute(sql, (sell_price, customer_name, customer_phone, sell_notes, profit, phone_id))
             conn.commit()
             return True, f"تم البيع! صافي الربح: {profit:,.2f} ج.م"
+    except Exception as e:
+        return False, f"حدث خطأ أثناء البيع: {str(e)}"
     finally:
         conn.close()
 
@@ -98,6 +113,8 @@ def return_phone_db(phone_id):
             cur.execute(sql, (phone_id,))
             conn.commit()
             return True, "تم إرجاع الجهاز لقائمة المتاح!"
+    except Exception as e:
+        return False, f"حدث خطأ أثناء الإرجاع: {str(e)}"
     finally:
         conn.close()
 
@@ -119,11 +136,18 @@ def get_monthly_report(year, month):
                 'total_profit': sum(i['profit'] for i in items if i['profit']),
                 'items': items
             }
+    except Exception as e:
+        print(f"Report Error: {e}")
+        return {'total_sales': 0, 'total_profit': 0, 'items': []}
     finally:
         conn.close()
 
 # --- 7. محرك المزامنة التلقائي للسحاب (Background Sync Worker) ---
 def start_sync_thread():
+    # إلغاء تشغيل خيط المزامنة نهائياً في Vercel لمنع الانهيار
+    if os.environ.get("VERCEL"):
+        return
+
     def sync_loop():
         while True:
             try:
@@ -152,7 +176,7 @@ def start_sync_thread():
                 c_conn.close()
             except Exception:
                 pass
-            time.sleep(15) # يفحص ويرفع البيانات كل 15 ثانية تلقائياً
+            time.sleep(15)
 
     t = threading.Thread(target=sync_loop, daemon=True)
     t.start()
