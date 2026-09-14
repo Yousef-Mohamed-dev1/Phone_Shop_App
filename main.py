@@ -1,3 +1,4 @@
+import os
 import flet as ft
 import flet.fastapi as flet_fastapi
 from db_helpers import add_new_phone, search_phone, sell_phone_db, return_phone_db, get_monthly_report, get_connection, start_sync_thread
@@ -12,8 +13,12 @@ def main(page: ft.Page):
     page.padding = 0
     page.rtl = True
 
-    # بدء تشغيل المزامنة الخفية للسحاب
-    start_sync_thread()
+    # تشغيل المزامنة فقط إذا كان التطبيق يعمل محلياً وليس على Vercel
+    if not os.environ.get("VERCEL"):
+        try:
+            start_sync_thread()
+        except Exception as e:
+            print(f"Skipping local sync thread: {e}")
 
     # رأس الصفحة
     status_text = ft.Text("جاري الفحص...", size=12, color=ft.colors.GREY_700)
@@ -171,13 +176,15 @@ def main(page: ft.Page):
     )
 
     page.add(body)
-    _, conn_name = get_connection()
-    status_text.value = f"الشبكة: {conn_name}"
+    try:
+        _, conn_name = get_connection()
+        status_text.value = f"الشبكة: {conn_name}"
+    except Exception:
+        status_text.value = "الشبكة: Vercel Cloud"
     page.update()
-    
-# 1. تعريف المتغير في المستوى الرئيسي للملف خارج أي شرط ليتعرف عليه Vercel
+
 app = flet_fastapi.app(main)
-# 2. التشغيل المحلي (اختياري عند تشغيل الملف على جهازك)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
