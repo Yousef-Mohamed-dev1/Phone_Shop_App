@@ -174,6 +174,10 @@ def main(page: ft.Page):
     _, conn_name = get_connection()
     status_text.value = f"الشبكة: {conn_name}"
     page.update()
-
+    
+# 1. تعريف المتغير في المستوى الرئيسي للملف خارج أي شرط ليتعرف عليه Vercel
+app = flet_fastapi.app(main)
+# 2. التشغيل المحلي (اختياري عند تشغيل الملف على جهازك)
 if __name__ == "__main__":
-    app = flet_fastapi.app(main)
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
