@@ -1,2 +1,4 @@
 flet
+flet-fastapi
+uvicorn
 psycopg2-binary

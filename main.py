@@ -1,4 +1,5 @@
 import flet as ft
+import flet.fastapi as flet_fastapi
 from db_helpers import add_new_phone, search_phone, sell_phone_db, return_phone_db, get_monthly_report, get_connection, start_sync_thread
 
 SECRET_PIN = "kk1102" # كلمة السر لحماية الشاشات الحساسة
@@ -175,4 +176,4 @@ def main(page: ft.Page):
     page.update()
 
 if __name__ == "__main__":
-    app = ft.app(target=main, export_asgi=True)
+    app = flet_fastapi.app(main)
